@@ -1,0 +1,509 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Tamilnadu Movie Director</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#101820;color:white;font-family:Arial,sans-serif;touch-action:none}
+#game{width:100%;height:100%;display:block}
+button{color:white;background:#182b3b;border:1px solid #d9b35b;border-radius:12px;font-weight:bold;cursor:pointer;touch-action:none}
+button:active{background:#a66c24}
+#hud{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.box{background:#101820dd;border:1px solid #d9b35b;border-radius:12px;padding:9px;font-size:12px;line-height:1.65}
+#brand{font-size:14px;font-weight:bold;color:#ffd36c}
+#stats{text-align:right}
+#controls{position:absolute;bottom:14px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:end;pointer-events:none}
+#pad{display:grid;grid-template-columns:48px 48px 48px;grid-template-rows:48px 48px 48px;gap:4px;pointer-events:auto}
+#pad button{font-size:23px;background:#12283adf}
+#pad .empty{visibility:hidden}
+#rightControls{display:flex;flex-direction:column;gap:7px;pointer-events:auto}
+#rightControls button{min-width:100px;min-height:45px;font-size:12px;background:#12283aee}
+#hint{position:absolute;top:105px;left:50%;transform:translateX(-50%);background:#101820dc;border-radius:9px;padding:8px 12px;text-align:center;font-size:12px;max-width:88%;pointer-events:none}
+#toast{position:absolute;top:145px;left:50%;transform:translateX(-50%);background:#182b3bee;border:1px solid #d9b35b;border-radius:10px;padding:10px;display:none;text-align:center;font-size:13px;max-width:90%;pointer-events:none}
+#menu{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:88%;max-width:360px;max-height:80%;overflow:auto;background:#111d2af5;border:2px solid #d9b35b;border-radius:17px;padding:17px;text-align:center}
+#menu h2{color:#ffd36c;margin:5px}
+#menu p{font-size:13px;line-height:1.5}
+#menu button{width:100%;padding:12px;margin:5px 0;font-size:13px}
+#close{background:#49332a}
+@media(max-width:380px){
+ #brand{font-size:11px}
+ .box{padding:7px;font-size:10px}
+ #pad{grid-template-columns:42px 42px 42px;grid-template-rows:42px 42px 42px}
+ #rightControls button{min-width:84px;font-size:10px}
+}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas><div id="hud">
+ <div class="box">
+  <div id="brand">🎬 TAMILNADU MOVIE DIRECTOR</div>
+  <div id="money">💰 ₹10,00,000</div>
+  <div id="career">⭐ Assistant Director</div>
+  <div id="movies">🎞️ Movies: 0</div>
+ </div>
+ <div class="box" id="stats">
+  <div>📍 CHENNAI</div>
+  <div id="mode">🚶 Walking</div>
+  <div id="day">☀️ Day 1</div>
+ </div>
+</div><div id="hint">Explore Chennai • Find your office • Make your first movie!</div>
+<div id="toast" role="status"></div><div id="controls">
+ <div id="pad">
+  <button class="empty"></button>
+  <button data-key="up">▲</button>
+  <button class="empty"></button>
+  <button data-key="left">◀</button>
+  <button data-key="down">▼</button>
+  <button data-key="right">▶</button>
+  <button class="empty"></button>
+  <button class="empty"></button>
+  <button class="empty"></button>
+ </div>
+ <div id="rightControls">
+  <button id="interact">🏢 INTERACT</button>
+  <button id="car">🚗 DRIVE / EXIT</button>
+  <button id="moviesBtn">🎬 MOVIES</button>
+  <button id="save">💾 SAVE</button>
+ </div>
+</div><div id="menu">
+ <h2 id="menuTitle">🎬 MOVIE STUDIO</h2>
+ <p id="menuInfo">Choose your movie project.</p>
+ <button data-movie="Action" data-cost="200000">🔥 Action Movie — ₹2,00,000</button>
+ <button data-movie="Comedy" data-cost="100000">😂 Comedy Movie — ₹1,00,000</button>
+ <button data-movie="Romance" data-cost="150000">❤️ Romance Movie — ₹1,50,000</button>
+ <button data-movie="Thriller" data-cost="250000">🕵️ Thriller Movie — ₹2,50,000</button>
+ <button id="close">⬅ CLOSE</button>
+</div><script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+const canvas=document.getElementById('game');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9bd5ef);
+scene.fog=new THREE.Fog(0x9bd5ef,55,155);
+
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,0.1,350);
+const renderer=new THREE.WebGLRenderer({canvas,antialias:false});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+renderer.shadowMap.enabled=false;
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x61735a,2));
+const sun=new THREE.DirectionalLight(0xffedcf,2.0);
+sun.position.set(-20,35,15);
+scene.add(sun);
+
+const material=(color,roughness=0.9)=>new THREE.MeshStandardMaterial({color,roughness});
+
+function cube(parent,w,h,d,color,x,y,z){
+ const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material(color));
+ mesh.position.set(x,y,z);
+ parent.add(mesh);
+ return mesh;
+}
+
+// Ground
+cube(scene,240,0.2,240,0x719764,0,-0.2,0);
+
+// Main roads
+function road(x,z,w,d){
+ cube(scene,w,0.08,d,0x454950,x,0,z);
+}
+road(0,0,240,13);
+road(0,0,13,240);
+road(0,45,240,9);
+road(45,0,9,240);
+road(-45,0,9,240);
+road(0,-45,240,9);
+
+// Road markings
+for(let n=-110;n<=110;n+=8){
+ cube(scene,3,0.025,0.16,0xf3d783,n,0.06,0);
+ cube(scene,0.16,0.025,3,0xf3d783,0,0.06,n);
+}
+
+// Pavements
+for(const z of [-7.5,7.5]){
+ cube(scene,240,0.15,1.5,0xbcb8a6,0,0.04,z);
+}
+for(const x of [-7.5,7.5]){
+ cube(scene,1.5,0.15,240,0xbcb8a6,x,0.04,0);
+}
+
+const buildings=[];
+const wallColors=[0xe8d8bc,0xdcc5a7,0xf1e6d2,0xd1d9d4,0xd5b9a0,0xe0caca];
+
+function building(x,z,w,d,h,color,label,type='house'){
+ const group=new THREE.Group();
+ const wall=material(color);
+ const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wall);
+ body.position.y=h/2;
+ group.add(body);
+
+ // Roof slab
+ cube(group,w+0.3,0.28,d+0.3,0xb8b5ab,0,h+0.05,0);
+
+ // Front-facing windows
+ const cols=Math.max(2,Math.floor(w/2.2));
+ const floors=Math.max(1,Math.floor((h-1)/2.7));
+
+ for(let f=0;f<floors;f++){
+  for(let c=0;c<cols;c++){
+   const wx=-w/2+(c+0.5)*w/cols;
+   const wy=1.5+f*2.6;
+   if(wy>h-0.5)continue;
+
+   cube(group,0.95,1.15,0.09,0xf4e9d7,wx,wy,-d/2-0.06);
+   cube(group,0.72,0.92,0.05,0x76b7d2,wx,wy,-d/2-0.12);
+
+   if(type==='apartment'&&f>0){
+    cube(group,1.12,0.09,0.55,0xb7b5ae,wx,wy-0.66,-d/2-0.38);
+    cube(group,1.08,0.35,0.07,0xede8de,wx,wy-0.47,-d/2-0.65);
+   }
+  }
+ }
+
+ // Front door
+ cube(group,1.0,2.0,0.12,0x79553d,0,1,-d/2-0.1);
+
+ // Ground floor shopfront
+ if(type==='shop'){
+  cube(group,w*0.75,0.28,0.2,0xb54437,0,2.55,-d/2-0.15);
+  cube(group,w*0.66,1.0,0.1,0x73b6c9,0,1.35,-d/2-0.17);
+  cube(group,w*0.8,0.08,0.8,0xd7b56d,0,2.1,-d/2-0.45);
+ }
+
+ group.position.set(x,0,z);
+ scene.add(group);
+ buildings.push({x,z,w,d,h,label,group});
+ return group;
+}
+
+// Chennai-inspired neighborhood.
+// The locations are fictional and arranged for gameplay.
+for(let x=-90;x<=90;x+=18){
+ for(let z=-90;z<=90;z+=18){
+  if(Math.abs(x)<12||Math.abs(z)<12)continue;
+  if(Math.abs(x)===54&&Math.abs(z)===54)continue;
+
+  const r=Math.random();
+  const w=7+Math.random()*3;
+  const d=7+Math.random()*3;
+  let h,type,label;
+
+  if(r<0.36){
+   h=3.8+Math.random()*1.5;
+   type='house';label='Chennai House';
+  }else if(r<0.70){
+   h=5+Math.random()*3;
+   type='shop';label='Chennai Shop';
+  }else{
+   h=10+Math.random()*8;
+   type='apartment';label='Chennai Apartment';
+  }
+
+  building(
+   x+(Math.random()-0.5)*3,
+   z+(Math.random()-0.5)*3,
+   w,d,h,
+   wallColors[Math.floor(Math.random()*wallColors.length)],
+   label,type
+  );
+ }
+}
+
+// Decorative trees
+function tree(x,z){
+ const g=new THREE.Group();
+ const trunk=new THREE.Mesh(
+  new THREE.CylinderGeometry(0.18,0.28,2,7),
+  material(0x755034)
+ );
+ trunk.position.y=1;g.add(trunk);
+
+ const leaves=new THREE.Mesh(
+  new THREE.SphereGeometry(1.25,8,7),
+  material(0x39784b)
+ );
+ leaves.position.y=2.8;g.add(leaves);
+ g.position.set(x,0,z);
+ scene.add(g);
+}
+for(let n=-100;n<=100;n+=20){
+ tree(n,10.5);
+ tree(n,-10.5);
+ tree(10.5,n);
+ tree(-10.5,n);
+}
+
+// Special locations
+const office=building(19,-13,11,9,7,0xe0bc83,'Director Office','shop');
+cube(scene,7,1.0,0.18,0x182b3b,19,5,-17.65);
+cube(scene,5.9,0.13,0.08,0xe7bd58,19,5.05,-17.76);
+
+const studio=building(-20,18,15,12,8,0xc8c5bf,'Film Studio','shop');
+cube(scene,8,1.0,0.18,0x263b50,-20,5.5,11.85);
+cube(scene,7,0.13,0.08,0xe7bd58,-20,5.5,11.73);
+
+// Player
+const player=new THREE.Group();
+const skin=material(0xb77e58);
+const shirt=material(0x244d78);
+const trousers=material(0x282b34);
+const hair=material(0x171717);
+
+cube(player,0.9,1.2,0.5,0x244d78,0,1.45,0);
+const head=new THREE.Mesh(new THREE.SphereGeometry(0.34,12,10),skin);
+head.position.y=2.28;
+player.add(head);
+const hairCap=new THREE.Mesh(new THREE.SphereGeometry(0.35,12,8,0,Math.PI*2,0,Math.PI/2),hair);
+hairCap.position.y=2.43;
+player.add(hairCap);
+
+for(const x of [-0.25,0.25]){
+ cube(player,0.28,0.8,0.32,0x282b34,x,0.45,0);
+ cube(player,0.23,0.8,0.28,0xb77e58,x*2,1.45,0);
+}
+player.position.set(0,0,5);
+scene.add(player);
+
+// Car
+const car=new THREE.Group();
+cube(car,2.4,0.8,4,0xc54438,0,0.8,0);
+cube(car,1.8,0.8,2,0x8ac5d9,0,1.55,-0.15);
+for(const x of [-1.25,1.25]){
+ for(const z of [-1.25,1.25]){
+  const wheel=new THREE.Mesh(
+   new THREE.CylinderGeometry(0.42,0.42,0.25,12),
+   material(0x202126)
+  );
+  wheel.rotation.z=Math.PI/2;
+  wheel.position.set(x,0.45,z);
+  car.add(wheel);
+ }
+}
+car.position.set(4,0,5);
+scene.add(car);
+
+let driving=false;
+let money=1000000;
+let movieCount=0;
+let career='Assistant Director';
+let day=1;
+let totalEarnings=0;
+
+const keys={up:false,down:false,left:false,right:false};
+
+function updateHUD(){
+ document.getElementById('money').textContent='💰 ₹'+money.toLocaleString('en-IN');
+ document.getElementById('career').textContent='⭐ '+career;
+ document.getElementById('movies').textContent='🎞️ Movies: '+movieCount;
+ document.getElementById('mode').textContent=driving?'🚗 Driving':'🚶 Walking';
+ document.getElementById('day').textContent='☀️ Day '+day;
+}
+
+function toast(text){
+ const el=document.getElementById('toast');
+ el.textContent=text;
+ el.style.display='block';
+ clearTimeout(window.toastTimer);
+ window.toastTimer=setTimeout(()=>el.style.display='none',2600);
+}
+
+function openMenu(title='🎬 MOVIE STUDIO',info='Choose a project to begin production.'){
+ document.getElementById('menuTitle').textContent=title;
+ document.getElementById('menuInfo').textContent=info;
+ document.getElementById('menu').style.display='block';
+}
+function closeMenu(){
+ document.getElementById('menu').style.display='none';
+}
+
+function near(x,z,distance){
+ return Math.hypot(player.position.x-x,player.position.z-z)<distance;
+}
+
+document.getElementById('interact').addEventListener('click',()=>{
+ if(driving){
+  toast('Exit the car before entering a building.');
+  return;
+ }
+ if(near(19,-13,15)){
+  openMenu('🏢 DIRECTOR OFFICE','Welcome, Director! Choose a film project.');
+ }else if(near(-20,18,17)){
+  openMenu('🎥 FILM STUDIO','Your film studio is ready. Select a production.');
+ }else{
+  toast('Find the Director Office or Film Studio.');
+ }
+});
+
+document.getElementById('moviesBtn').addEventListener('click',()=>{
+ openMenu('🎬 MOVIE PROJECTS','Select a genre and produce a movie.');
+});
+
+document.getElementById('close').addEventListener('click',closeMenu);
+
+document.querySelectorAll('[data-movie]').forEach(btn=>{
+ btn.addEventListener('click',()=>{
+  const genre=btn.dataset.movie;
+  const cost=Number(btn.dataset.cost);
+
+  if(money<cost){
+   document.getElementById('menuInfo').textContent='Not enough money for this project.';
+   return;
+  }
+
+  money-=cost;
+  movieCount++;
+  day++;
+
+  // Simplified fictional box-office simulation
+  const skillBonus=Math.min(movieCount*0.08,0.5);
+  const returnRate=0.65+Math.random()*1.15+skillBonus;
+  const revenue=Math.floor(cost*returnRate);
+  money+=revenue;
+  totalEarnings+=revenue;
+
+  if(movieCount>=2)career='Movie Director';
+  if(movieCount>=5)career='Successful Director';
+  if(movieCount>=10)career='Star Director';
+
+  updateHUD();
+
+  document.getElementById('menuInfo').textContent=
+   genre+' Movie completed! Simulated return: ₹'+revenue.toLocaleString('en-IN')+
+   '. Total movies: '+movieCount+'.';
+
+  toast('🎉 Your '+genre+' movie has been released!');
+ });
+});
+
+// Car enter/exit
+document.getElementById('car').addEventListener('click',()=>{
+ if(!driving){
+  if(Math.hypot(player.position.x-car.position.x,player.position.z-car.position.z)<6){
+   driving=true;
+   player.visible=false;
+   toast('🚗 You entered the car!');
+  }else{
+   toast('Go near the red car to enter it.');
+  }
+ }else{
+  driving=false;
+  player.visible=true;
+  player.position.x=car.position.x+2.5;
+  player.position.z=car.position.z;
+  toast('You exited the car.');
+ }
+ updateHUD();
+});
+
+// Touch controls
+document.querySelectorAll('[data-key]').forEach(btn=>{
+ const key=btn.dataset.key;
+ const press=e=>{e.preventDefault();keys[key]=true;};
+ const release=e=>{e.preventDefault();keys[key]=false;};
+ btn.addEventListener('pointerdown',press);
+ btn.addEventListener('pointerup',release);
+ btn.addEventListener('pointercancel',release);
+ btn.addEventListener('lostpointercapture',release);
+ btn.addEventListener('contextmenu',e=>e.preventDefault());
+});
+
+window.addEventListener('keydown',e=>{
+ if(e.key==='ArrowUp'||e.key==='w')keys.up=true;
+ if(e.key==='ArrowDown'||e.key==='s')keys.down=true;
+ if(e.key==='ArrowLeft'||e.key==='a')keys.left=true;
+ if(e.key==='ArrowRight'||e.key==='d')keys.right=true;
+});
+window.addEventListener('keyup',e=>{
+ if(e.key==='ArrowUp'||e.key==='w')keys.up=false;
+ if(e.key==='ArrowDown'||e.key==='s')keys.down=false;
+ if(e.key==='ArrowLeft'||e.key==='a')keys.left=false;
+ if(e.key==='ArrowRight'||e.key==='d')keys.right=false;
+});
+
+// Save/load
+function saveGame(){
+ const state={
+  money,movieCount,career,day,totalEarnings,
+  x:player.position.x,z:player.position.z,
+  carX:car.position.x,carZ:car.position.z
+ };
+ try{
+  localStorage.setItem('tmd-game-save',JSON.stringify(state));
+  toast('💾 Game saved on this browser.');
+ }catch(e){
+  toast('Save unavailable in this preview. Try opening the project directly.');
+ }
+}
+document.getElementById('save').addEventListener('click',saveGame);
+
+try{
+ const saved=JSON.parse(localStorage.getItem('tmd-game-save'));
+ if(saved){
+  money=saved.money??money;
+  movieCount=saved.movieCount??0;
+  career=saved.career??career;
+  day=saved.day??1;
+  totalEarnings=saved.totalEarnings??0;
+  player.position.x=saved.x??0;
+  player.position.z=saved.z??5;
+  car.position.x=saved.carX??4;
+  car.position.z=saved.carZ??5;
+ }
+}catch(e){}
+
+const clock=new THREE.Clock();
+const target=new THREE.Vector3();
+
+function animate(){
+ requestAnimationFrame(animate);
+
+ const dt=Math.min(clock.getDelta(),0.05);
+ let dx=0,dz=0;
+
+ if(keys.up)dz-=1;
+ if(keys.down)dz+=1;
+ if(keys.left)dx-=1;
+ if(keys.right)dx+=1;
+
+ if(dx||dz){
+  const length=Math.hypot(dx,dz);
+  dx/=length;
+  dz/=length;
+
+  const speed=driving?15:7;
+
+  if(driving){
+   car.position.x+=dx*speed*dt;
+   car.position.z+=dz*speed*dt;
+   car.rotation.y=Math.atan2(dx,dz);
+  }else{
+   player.position.x+=dx*speed*dt;
+   player.position.z+=dz*speed*dt;
+   player.rotation.y=Math.atan2(dx,dz);
+  }
+ }
+
+ const actor=driving?car:player;
+ actor.position.x=THREE.MathUtils.clamp(actor.position.x,-112,112);
+ actor.position.z=THREE.MathUtils.clamp(actor.position.z,-112,112);
+
+ target.set(actor.position.x,5.5,actor.position.z+9);
+ camera.position.lerp(target,0.09);
+ camera.lookAt(actor.position.x,1.1,actor.position.z);
+
+ renderer.render(scene,camera);
+}
+
+window.addEventListener('resize',()=>{
+ camera.aspect=innerWidth/innerHeight;
+ camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
+
+updateHUD();
+animate();
+</script></body>
+</html>
